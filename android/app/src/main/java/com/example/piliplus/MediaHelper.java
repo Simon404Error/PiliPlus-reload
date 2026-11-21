@@ -17,16 +17,55 @@
 package com.example.piliplus;
 
 import android.app.PendingIntent;
+import android.app.RemoteAction;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Icon;
 import android.media.session.PlaybackState;
 import android.os.Build;
 import android.view.KeyEvent;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+
+import com.ryanheise.audioservice.AudioService;
 
 class MediaHelper {
-    static PendingIntent buildMediaButtonPendingIntent(Context context, int action) {
-        int keyCode = PlaybackStateCompat_toKeyCode(action);
-        Intent intent = new Intent(context, com.ryanheise.audioservice.MediaButtonReceiver.class);
+    private static @NonNull Intent getIntent(@NonNull Context context) {
+        return new Intent(context, com.ryanheise.audioservice.MediaButtonReceiver.class);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    static RemoteAction getRemoteAction(Context context, @DrawableRes int resId, String title, int action) {
+        return new RemoteAction(
+                Icon.createWithResource(context, resId),
+                title,
+                title,
+                buildMediaButtonPendingIntent(context, playbackStateToKeyCode(action))
+        );
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    static RemoteAction getCustomRemoteAction(Context context, @DrawableRes int resId, int code, @NonNull String title) {
+        return new RemoteAction(
+                Icon.createWithResource(context, resId),
+                title,
+                title,
+                buildCustomActionPendingIntent(context, code, title)
+        );
+    }
+
+    static @NonNull PendingIntent buildCustomActionPendingIntent(@NonNull Context context, int code, String customAction) {
+        Intent intent = getIntent(context);
+        intent.setAction(AudioService.NOTIFICATION_CUSTOM_ACTION);
+        intent.putExtra(AudioService.NOTIFICATION_CUSTOM_ACTION_NAME, customAction);
+        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        return PendingIntent.getBroadcast(context, code, intent,
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
+    }
+
+    private static PendingIntent buildMediaButtonPendingIntent(Context context, int keyCode) {
+        Intent intent = getIntent(context);
         intent.setAction(Intent.ACTION_MEDIA_BUTTON);
         intent.putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
         intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
@@ -34,7 +73,7 @@ class MediaHelper {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0);
     }
 
-    private static int PlaybackStateCompat_toKeyCode(int action) {
+    private static int playbackStateToKeyCode(int action) {
         return switch (action) {
             case (int) PlaybackState.ACTION_STOP -> KeyEvent.KEYCODE_MEDIA_STOP;
             case (int) PlaybackState.ACTION_PAUSE -> KeyEvent.KEYCODE_MEDIA_PAUSE;
@@ -47,5 +86,4 @@ class MediaHelper {
             default -> KeyEvent.KEYCODE_UNKNOWN;
         };
     }
-
 }
